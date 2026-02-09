@@ -1,7 +1,7 @@
 ---
 name: reviewing-skills
-description: Reviews Claude Code skills against Anthropic's best practices. Analyzes skill structure, metadata, content quality, and code conventions. Generates a structured compliance report with prioritized recommendations. Triggers - '/review-skill' (reviews ./learning-esl-vocabulary by default) or '/review-skill path/to/skill' (reviews specific skill path).
-argument-hint: "'path/to/skill'" (optional)
+description: Reviews all skills in a Claude Code plugin against Anthropic's best practices. Analyzes skill structure, metadata, content quality, and code conventions for each skill listed in plugin.json. Generates a structured compliance report with prioritized recommendations. Triggers - '/review-skill path/to/plugin' (reviews all skills in the given plugin).
+argument-hint: "'path/to/plugin'" (required)
 allowed-tools:
   - Read
   - Glob
@@ -10,43 +10,49 @@ allowed-tools:
 
 # Reviewing Skills
 
-This skill reviews Claude Code skills against Anthropic's official best practices to ensure they follow guidelines for conciseness, structure, progressive disclosure, and code quality.
+This skill reviews all skills within a Claude Code plugin against Anthropic's official best practices to ensure they follow guidelines for conciseness, structure, progressive disclosure, and code quality.
 
 ## Trigger Commands
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/review-skill` | Review the learning-esl-vocabulary skill (default path: ./learning-esl-vocabulary) | `/review-skill` |
-| `/review-skill 'path'` | Review a specific skill at the given path | `/review-skill './my-custom-skill'` |
+| `/review-skill 'path'` | Review all skills in a plugin at the given path | `/review-skill './my-plugin'` |
 
 ## Review Workflow
 
-Follow these steps to conduct a comprehensive skill review:
+Follow these steps to conduct a comprehensive plugin review:
 
-### 1. Parse Arguments and Set Target Path
+### 1. Parse Arguments and Discover Skills
 
-- If no argument provided: use default path `./learning-esl-vocabulary`
-- If argument provided: use the specified path
-- Verify the path exists and contains a SKILL.md file
-- Normalize path to forward slashes for consistency
+- If no argument provided: display an error message:
+  > Error: No plugin path provided. Usage: `/review-skill 'path/to/plugin'`
+  Then stop execution.
+- If argument provided:
+  1. Verify the path exists
+  2. Look for `.claude-plugin/plugin.json` at the given path
+  3. Read `plugin.json` and parse the `"skills"` array to discover skill paths
+  4. Resolve each skill path relative to the plugin root
+  5. Verify each skill path exists and contains a SKILL.md file
 
 ### 2. Collect Skill Metrics
 
-Run the skill analyzer script to gather automated metrics:
+Run the skill analyzer script against the plugin to gather automated metrics for all skills:
 
 ```bash
-python reviewing-skills/scripts/skill-analyzer.py <target-path>
+python reviewing-skills/scripts/skill-analyzer.py <plugin-path>
 ```
 
-This provides:
+This provides per-skill:
 - SKILL.md line counts (total and body)
 - Frontmatter validation results
 - File structure analysis
 - Name/description constraint checks
 
+Plus plugin-level metadata (name, version, skills count).
+
 ### 3. Manual Review Against Checklist
 
-Read `references/best-practices-checklist.md` and evaluate the skill across four categories:
+For each skill discovered in the plugin, read `references/best-practices-checklist.md` and evaluate across four categories:
 
 - **Metadata (25 points)**: Name format, description quality, frontmatter fields
 - **Structure (25 points)**: File organization, reference depth, extraneous files
@@ -61,33 +67,51 @@ For each criterion:
 ### 4. Identify Issues and Recommendations
 
 Cross-reference findings with `references/common-issues.md` to:
-- Identify common anti-patterns
-- Generate specific, actionable recommendations
+- Identify common anti-patterns across all skills in the plugin
+- Generate specific, actionable recommendations per skill
 - Prioritize by severity: Critical, High, Medium, Low
 
 ### 5. Generate Review Report
 
 Use `references/review-report-template.md` to create a structured report containing:
 
-1. **Executive Summary**: Overall compliance score and status
-2. **Category Breakdown**: Detailed findings per category with pass/fail status
-3. **Prioritized Recommendations**: Actionable improvements ranked by severity
-4. **Detailed Findings**: Line-by-line issues with file references
+1. **Plugin Summary**: Plugin name, version, number of skills, and overall compliance
+2. **Per-Skill Reports**: For each skill in the plugin:
+   - Executive summary with overall compliance score and status
+   - Category breakdown with detailed findings and pass/fail status
+   - Prioritized recommendations ranked by severity
+   - Detailed findings with line-by-line issues and file references
+3. **Cross-Skill Observations**: Common patterns or issues found across multiple skills
 
-Save the report to the skill's directory as `skill-review-report.md`.
+Save the report to the plugin's directory as `plugin-review-report.md`.
 
 ## Output Format
 
 The review report should follow this structure:
 
 ```markdown
-# Skill Review Report: [Skill Name]
+# Plugin Review Report: [Plugin Name]
 
 **Review Date**: YYYY-MM-DD
+**Plugin Path**: path/to/plugin
+**Plugin Version**: X.Y.Z
+**Skills Reviewed**: N
+
+## Plugin Summary
+
+| Skill | Overall Score | Status | Critical | High | Medium | Low |
+|-------|---------------|--------|----------|------|--------|-----|
+| skill-name-1 | XX/100 | ✅/⚠️/❌ | N | N | N | N |
+| skill-name-2 | XX/100 | ✅/⚠️/❌ | N | N | N | N |
+
+---
+
+## Skill: [skill-name-1]
+
 **Skill Path**: path/to/skill
 **Overall Score**: XX/100
 
-## Summary
+### Summary
 
 | Category | Status | Score | Issues |
 |----------|--------|-------|--------|
@@ -96,33 +120,46 @@ The review report should follow this structure:
 | Content | ✅/⚠️/❌ | XX/25 | N |
 | Code Quality | ✅/⚠️/❌ | XX/25 | N |
 
-## Recommendations
+### Recommendations
 
-### Critical Priority
+#### Critical Priority
 - [Specific actionable recommendation]
 
-### High Priority
+#### High Priority
 - [Specific actionable recommendation]
 
-### Medium Priority
+#### Medium Priority
 - [Specific actionable recommendation]
 
-### Low Priority
+#### Low Priority
 - [Specific actionable recommendation]
 
-## Detailed Findings
+### Detailed Findings
 
-### Metadata
+#### Metadata
 [Detailed analysis...]
 
-### Structure
+#### Structure
 [Detailed analysis...]
 
-### Content
+#### Content
 [Detailed analysis...]
 
-### Code Quality
+#### Code Quality
 [Detailed analysis...]
+
+---
+
+## Skill: [skill-name-2]
+
+[Same structure as above, repeated for each skill]
+
+---
+
+## Cross-Skill Observations
+
+- [Common patterns or recurring issues across skills]
+- [Plugin-level structural observations]
 ```
 
 ## Reference Files
@@ -133,8 +170,9 @@ The review report should follow this structure:
 
 ## Notes
 
-- Default target is `./learning-esl-vocabulary` (source folder, not `.claude/skills/`)
+- The plugin path must contain `.claude-plugin/plugin.json` listing the skills to review
+- Each skill path in `plugin.json` is resolved relative to the plugin root
 - Reviews source files before packaging, not installed versions
 - Automated metrics complement manual review but don't replace it
 - Focus on actionable recommendations, not just compliance checking
-- Consider skill's specific use case when applying best practices
+- Consider each skill's specific use case when applying best practices

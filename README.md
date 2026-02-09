@@ -4,7 +4,7 @@ A Claude Code plugin for reviewing skills against Anthropic's official best prac
 
 ## Overview
 
-The **Reviewing Skills** plugin helps ensure your Claude Code skills follow best practices for structure, content, metadata, and code quality. It generates detailed compliance reports with actionable recommendations.
+The **Reviewing Skills** plugin helps ensure your Claude Code skills follow best practices for structure, content, metadata, and code quality. Point it at a plugin directory and it reviews all skills listed in `plugin.json`, generating detailed compliance reports with actionable recommendations.
 
 ## Installation
 
@@ -27,16 +27,39 @@ claude plugin install https://github.com/LennonHe/reviewing-skills.git
 
 ## Usage
 
-### Review a Skill
+### Review All Skills in a Plugin
+
+```
+/review-skill './path/to/my-plugin'
+```
+
+The plugin path must contain a `.claude-plugin/plugin.json` file that lists the skills to review.
+
+**Example plugin.json structure:**
+
+```json
+{
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "description": "My Claude Code plugin",
+  "skills": [
+    "skills/my-first-skill",
+    "skills/my-second-skill"
+  ]
+}
+```
+
+### No Argument
 
 ```
 /review-skill
-/review-skill './path/to/your-skill'
 ```
+
+Shows an error with usage instructions. A plugin path is required.
 
 ## What Gets Reviewed
 
-The plugin evaluates four categories (25 points each):
+The plugin discovers all skills from `plugin.json` and evaluates each one across four categories (25 points each):
 
 ### 1. Metadata (25 points)
 - **Name Format**: Lowercase with hyphens, gerund form (e.g., `reviewing-skills`)
@@ -62,26 +85,26 @@ The plugin evaluates four categories (25 points each):
 
 The plugin generates a comprehensive report including:
 
-1. **Executive Summary**: Overall score and status
-2. **Summary Table**: Scores by category with issue counts
-3. **Prioritized Recommendations**: Critical, High, Medium, Low priority
-4. **Detailed Findings**: Line-by-line analysis with file references
+1. **Plugin Summary**: Overview table of all skills with scores and status
+2. **Per-Skill Reports**: Detailed findings for each skill in the plugin
+3. **Prioritized Recommendations**: Critical, High, Medium, Low priority per skill
+4. **Cross-Skill Observations**: Common patterns or issues across skills
 
 ### Scoring Guide
 
-- **90-100 points (✅ Excellent)**: Ready for production use
-- **75-89 points (⚠️ Good)**: Minor improvements recommended
-- **60-74 points (⚠️ Fair)**: Several issues to address
-- **Below 60 points (❌ Needs Work)**: Significant improvements required
+- **90-100 points (Excellent)**: Ready for production use
+- **75-89 points (Good)**: Minor improvements recommended
+- **60-74 points (Fair)**: Several issues to address
+- **Below 60 points (Needs Work)**: Significant improvements required
 
 ## Example Review Workflow
 
-1. **Create your skill** in a source folder (e.g., `my-skill/`)
-2. **Run the review**: `/review-skill './my-skill'`
-3. **Review the report**: Check scores and recommendations
+1. **Organize your plugin** with `.claude-plugin/plugin.json` listing your skills
+2. **Run the review**: `/review-skill './my-plugin'`
+3. **Review the report**: Check per-skill scores and recommendations
 4. **Make improvements**: Address critical and high priority issues
-5. **Re-run review**: Verify improvements
-6. **Package and install**: Once satisfied with the score
+5. **Re-run review**: Verify improvements across all skills
+6. **Package and publish**: Once satisfied with scores
 
 ## Dependencies
 
@@ -99,29 +122,40 @@ The plugin generates a comprehensive report including:
 ## Common Issues and Fixes
 
 ### Issue: Name uses underscores
-❌ `skill_name`
-✅ `skill-name`
+- `skill_name`
+- `skill-name`
 
 ### Issue: Description in first person
-❌ "Review skills against best practices"
-✅ "Reviews skills against best practices"
+- "Review skills against best practices"
+- "Reviews skills against best practices"
 
 ### Issue: SKILL.md over 500 lines
-💡 Move detailed content to `references/` folder
+Move detailed content to `references/` folder
 
 ### Issue: Backslashes in paths
-❌ `scripts\analyzer.py`
-✅ `scripts/analyzer.py`
+- `scripts\analyzer.py`
+- `scripts/analyzer.py`
 
 ## Troubleshooting
 
+### "Error: No plugin path provided"
+- You must provide a path to a plugin directory: `/review-skill './my-plugin'`
+
+### "Error: plugin.json not found"
+- Ensure the path points to a plugin root directory
+- The directory must contain `.claude-plugin/plugin.json`
+
+### "Error: Invalid plugin.json"
+- Verify `plugin.json` has required fields: `name`, `version`, `skills`
+- The `skills` field must be a non-empty array of skill paths
+
 ### "Error: Path does not exist"
-- Verify the path you provided exists
-- Use forward slashes even on Windows: `./my-skill` not `.\my-skill`
+- Verify the plugin path you provided exists
+- Use forward slashes even on Windows: `./my-plugin` not `.\my-plugin`
 
 ### "Error: SKILL.md not found"
-- Ensure you're pointing to the skill source folder
-- The folder must contain a SKILL.md file at its root
+- Check that each skill path in `plugin.json` points to a valid skill directory
+- Each skill directory must contain a SKILL.md file at its root
 
 ### "Warning: Could not read file"
 - Check file permissions

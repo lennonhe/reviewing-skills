@@ -3,10 +3,11 @@
 Skill Analyzer - Automated metrics collection for skill reviews.
 
 Usage:
-    python skill-analyzer.py <path-to-skill>
+    python skill-analyzer.py <path-to-plugin>
+    python skill-analyzer.py <path-to-skill>   (fallback for single skill)
 
 Output:
-    JSON object with skill metrics
+    JSON object with skill/plugin metrics
 """
 
 import sys
@@ -266,15 +267,131 @@ def analyze_skill(skill_path: str) -> Dict[str, Any]:
     return result
 
 
+def validate_plugin_json(plugin_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate plugin.json metadata.
+
+    Args:
+        plugin_data: Parsed plugin.json contents
+
+    Returns:
+        Dictionary with validation results
+    """
+    issues = []
+
+    if 'name' not in plugin_data:
+        issues.append("Missing required field: 'name'")
+
+    if 'version' not in plugin_data:
+        issues.append("Missing required field: 'version'")
+
+    if 'skills' not in plugin_data:
+        issues.append("Missing required field: 'skills'")
+    elif not isinstance(plugin_data['skills'], list):
+        issues.append("'skills' must be an array")
+    elif len(plugin_data['skills']) == 0:
+        issues.append("'skills' array is empty")
+
+    return {
+        'valid': len(issues) == 0,
+        'issues': issues
+    }
+
+
+def analyze_plugin(plugin_path: str) -> Dict[str, Any]:
+    """
+    Analyze all skills in a Claude Code plugin.
+
+    Reads .claude-plugin/plugin.json, discovers skill paths,
+    and runs analyze_skill() for each one.
+
+    Args:
+        plugin_path: Path to plugin root directory
+
+    Returns:
+        Dictionary with plugin metadata and per-skill results
+    """
+    plugin_path = Path(plugin_path)
+    plugin_json_path = plugin_path / '.claude-plugin' / 'plugin.json'
+
+    if not plugin_json_path.exists():
+        return {
+            'error': f"plugin.json not found at: {plugin_json_path}"
+        }
+
+    # Read and parse plugin.json
+    try:
+        with open(plugin_json_path, 'r', encoding='utf-8') as f:
+            plugin_data = json.load(f)
+    except json.JSONDecodeError as e:
+        return {
+            'error': f"Invalid JSON in plugin.json: {e}"
+        }
+    except Exception as e:
+        return {
+            'error': f"Could not read plugin.json: {e}"
+        }
+
+    # Validate plugin.json
+    validation = validate_plugin_json(plugin_data)
+    if not validation['valid']:
+        return {
+            'error': f"Invalid plugin.json: {'; '.join(validation['issues'])}",
+            'validation': validation
+        }
+
+    # Extract plugin metadata
+    plugin_metadata = {
+        'name': plugin_data.get('name'),
+        'version': plugin_data.get('version'),
+        'description': plugin_data.get('description'),
+        'skills_count': len(plugin_data.get('skills', []))
+    }
+
+    # Analyze each skill
+    skill_results = []
+    for skill_entry in plugin_data['skills']:
+        # skill_entry can be a string path or an object with a "path" key
+        if isinstance(skill_entry, str):
+            skill_rel_path = skill_entry
+        elif isinstance(skill_entry, dict) and 'path' in skill_entry:
+            skill_rel_path = skill_entry['path']
+        else:
+            skill_results.append({
+                'error': f"Invalid skill entry in plugin.json: {skill_entry}"
+            })
+            continue
+
+        skill_abs_path = plugin_path / skill_rel_path
+        result = analyze_skill(str(skill_abs_path))
+        result['plugin_relative_path'] = skill_rel_path
+        skill_results.append(result)
+
+    return {
+        'plugin_path': str(plugin_path),
+        'plugin': plugin_metadata,
+        'plugin_json_validation': validation,
+        'skills': skill_results
+    }
+
+
 def main():
     """Main entry point."""
     if len(sys.argv) < 2:
-        print("Usage: python skill-analyzer.py <path-to-skill>", file=sys.stderr)
-        print("\nAnalyzes a Claude Code skill and outputs metrics in JSON format.", file=sys.stderr)
+        print("Usage: python skill-analyzer.py <path-to-plugin>", file=sys.stderr)
+        print("\nAnalyzes all skills in a Claude Code plugin and outputs metrics in JSON format.", file=sys.stderr)
+        print("The path should point to a plugin root containing .claude-plugin/plugin.json.", file=sys.stderr)
+        print("\nFalls back to single-skill analysis if no plugin.json is found.", file=sys.stderr)
         sys.exit(1)
 
-    skill_path = sys.argv[1]
-    result = analyze_skill(skill_path)
+    target_path = sys.argv[1]
+    plugin_json_path = Path(target_path) / '.claude-plugin' / 'plugin.json'
+
+    if plugin_json_path.exists():
+        result = analyze_plugin(target_path)
+    else:
+        # Fallback: analyze as a single skill directory
+        result = analyze_skill(target_path)
 
     # Output JSON
     print(json.dumps(result, indent=2))
