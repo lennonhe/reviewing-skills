@@ -238,7 +238,7 @@ def analyze_skill(skill_path: str) -> Dict[str, Any]:
 
     # Build result
     result = {
-        'skill_path': str(skill_path),
+        'skill_path': str(skill_path).replace('\\', '/'),
         'skill_md': {
             'total_lines': total_lines,
             'body_lines': body_lines,
@@ -364,11 +364,11 @@ def analyze_plugin(plugin_path: str) -> Dict[str, Any]:
 
         skill_abs_path = plugin_path / skill_rel_path
         result = analyze_skill(str(skill_abs_path))
-        result['plugin_relative_path'] = skill_rel_path
+        result['plugin_relative_path'] = skill_rel_path.replace('\\', '/')
         skill_results.append(result)
 
     return {
-        'plugin_path': str(plugin_path),
+        'plugin_path': str(plugin_path).replace('\\', '/'),
         'plugin': plugin_metadata,
         'plugin_json_validation': validation,
         'skills': skill_results
